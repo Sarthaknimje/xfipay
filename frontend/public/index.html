@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XFI Payment Request</title>
+    <style>
+        /* Global Styling */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1b1b2f, #162447);
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #ffd700;
+            font-size: 3em;
+            font-weight: bold;
+        }
+
+        p {
+            font-size: 1.2em;
+            color: #e0e0e0;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        /* Form Container */
+        form {
+            background-color: #1f4068;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.5);
+            width: 100%;
+        }
+
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            font-size: 1.2em;
+            text-align: left;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            color: #333;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="datetime-local"]:focus {
+            outline: none;
+            border: 2px solid #ffd700;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: #ffd700;
+            color: #1b1b2f;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #ffcc00;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* Result Display */
+        #result {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #result a {
+            color: #ffd700;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #result.success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        #result.error {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        /* QR Code Container */
+        #qrcode {
+            margin-top: 20px;
+        }
+
+        /* Responsive Styling */
+        @media (max-width: 600px) {
+            form {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2.5em;
+            }
+
+            p {
+                font-size: 1em;
+            }
+        }
+    </style>
+    <!-- Include QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>XFIPAY</h1>
+        <p><strong>XFIPAY</strong> is a fast, secure platform that allows you to create payment requests for XFI in seconds. Use XFIPAY to send payments to customers, friends, or any XFI wallet holder worldwide. It’s simple, quick, and efficient.</p>
+
+        <form id="payment-form">
+            <label for="walletAddress"><strong>XFI Wallet Address:</strong></label>
+            <input type="text" id="walletAddress" placeholder="Enter wallet address" required>
+
+            <label for="amount"><strong>Amount:</strong></label>
+            <input type="number" id="amount" placeholder="Enter amount in XFI" required>
+
+            <label for="description"><strong>Description:</strong></label>
+            <input type="text" id="description" placeholder="Payment description" required>
+
+            <label for="expiryDate"><strong>Expiry Date and Time:</strong></label>
+            <input type="datetime-local" id="expiryDate" required>
+
+            <button type="submit">Create Payment Request</button>
+        </form>
+
+        <div id="result"></div>
+        <div id="qrcode"></div> <!-- QR Code Container -->
+    </div>
+
+    <script>
+        document.getElementById('payment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Get the form values
+            const walletAddress = document.getElementById('walletAddress').value;
+            const amount = document.getElementById('amount').value;
+            const description = document.getElementById('description').value;
+            const expiryDate = document.getElementById('expiryDate').value;
+
+            // Ensure all required fields are filled
+            if (!walletAddress || !amount || !description || !expiryDate) {
+                document.getElementById('result').innerHTML = '<p class="error">Please fill out all fields.</p>';
+                return;
+            }
+
+            // Call the backend API to create the payment request
+            try {
+                const response = await fetch('/create-payment-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ walletAddress, amount, description, expiryDate }),
+                });
+
+                const data = await response.json();
+
+                // Check if the payment request was created successfully
+                if (data.success) {
+                    document.getElementById('result').innerHTML = `
+                        <p class="success">Payment link created successfully!</p>
+                        <p><a href="${data.paymentLink}" target="_blank">${data.paymentLink}</a></p>
+                    `;
+
+                    // Generate QR code
+                    $('#qrcode').html('').qrcode({
+                        width: 128,
+                        height: 128,
+                        text: data.paymentLink // Use the generated payment link
+                    });
+                } else {
+                    document.getElementById('result').innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = '<p class="error">An error occurred. Please try again.</p>';
+            }
+        });
+    </script>
+</body>
+
+</html>

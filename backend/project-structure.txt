@@ -1,0 +1,19 @@
+crossfi-payment-request-app/
+├── client/
+│   ├── public/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       ├── store/
+│       ├── utils/
+│       ├── App.js
+│       └── index.js
+├── server/
+│   ├── controllers/
+│   ├── models/
+│   ├── routes/
+│   └── index.js
+├── contracts/
+│   └── PaymentRequest.sol
+├── package.json
+└── README.md

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XFI Payment</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            margin: 0;
+            padding: 0;
+            color: #fff;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #1f1f1f;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            text-align: center;
+            color: #ffdd57;
+        }
+        p, h2 {
+            color: #ccc;
+        }
+        .payment-info {
+            background-color: #282828;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        #pay-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: #ffdd57;
+            color: #121212;
+            border: none;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #pay-button:hover {
+            background-color: #e6c44f;
+        }
+        #pay-button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .error {
+            color: #ff4c4c;
+        }
+        .completed {
+            color: #4caf50;
+        }
+        .xfi-info {
+            margin-top: 40px;
+            background-color: #212121;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .xfi-info h2 {
+            color: #ffdd57;
+        }
+        .xfi-info p {
+            line-height: 1.6;
+            color: #ccc;
+        }
+        .xfi-info a {
+            color: #ffdd57;
+            text-decoration: none;
+        }
+        .xfi-info a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>XFI Payment Portal</h1>
+        <div id="payment-details" class="payment-info"></div>
+        <button id="pay-button">Pay with MetaMask</button>
+        <div id="message"></div>
+
+        <!-- CrossFi Information Section -->
+        <div class="xfi-info">
+            <h2>What is CrossFi (XFI)?</h2>
+            <p>CrossFi (XFI) is an innovative decentralized finance (DeFi) protocol that bridges the gap between traditional financial services and blockchain technology. With XFI, users can seamlessly transfer, stake, and earn interest on their assets across multiple blockchains, ensuring high liquidity and low transaction fees.</p>
+            <p>The XFI token is a critical part of the CrossFi ecosystem, enabling governance rights, staking rewards, and powering transactions within the network. To learn more about CrossFi, <a href="https://crossfi.org" target="_blank">visit our official website</a>.</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const paymentId = window.location.pathname.split('/').pop();
+            const paymentDetails = document.getElementById('payment-details');
+            const payButton = document.getElementById('pay-button');
+            const message = document.getElementById('message');
+
+            let paymentData;
+
+            try {
+                const response = await fetch(`/payment-details/${paymentId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    paymentData = data.paymentRequest;
+                    const { walletAddress, amount, description, expiryDate, status } = paymentData;
+                    paymentDetails.innerHTML = `
+                        <p><strong>Wallet Address:</strong> ${walletAddress}</p>
+                        <p><strong>Amount:</strong> ${amount} XFI</p>
+                        <p><strong>Description:</strong> ${description}</p>
+                        <p><strong>Expiry Date:</strong> ${new Date(expiryDate).toLocaleString()}</p>
+                        <p><strong>Status:</strong> ${status}</p>
+                    `;
+
+                    if (status === 'paid') {
+                        payButton.disabled = true;
+                        message.innerHTML = '<p class="completed">This payment has already been completed.</p>';
+                    }
+                } else {
+                    paymentDetails.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                    payButton.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                paymentDetails.innerHTML = '<p class="error">An error occurred. Please try again.</p>';
+                payButton.disabled = true;
+            }
+
+            payButton.addEventListener('click', async () => {
+                if (typeof window.ethereum !== 'undefined') {
+                    try {
+                        // Request account access
+                        await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        const web3 = new Web3(window.ethereum);
+
+                        const accounts = await web3.eth.getAccounts();
+
+                        if (paymentData) {
+                            const { walletAddress, amount } = paymentData;
+                            const amountInWei = web3.utils.toWei(amount.toString(), 'ether');
+
+                            // Prepare the transaction parameters
+                            const transactionParameters = {
+                                to: walletAddress,
+                                from: accounts[0],
+                                value: web3.utils.numberToHex(amountInWei),
+                                gas: '0x5208', // 21000 gas (in hex)
+                                data: web3.utils.utf8ToHex('XFI Payment'),
+                            };
+
+                            // Send the transaction
+                            const txHash = await window.ethereum.request({
+                                method: 'eth_sendTransaction',
+                                params: [transactionParameters],
+                            });
+
+                            // Wait for the transaction to be mined
+                            const receipt = await web3.eth.getTransactionReceipt(txHash);
+
+                            if (receipt && receipt.status) {
+                                await fetch(`/update-payment-status/${paymentId}`, { method: 'POST' });
+                                alert('Payment successful!');
+                                location.reload();
+                            } else {
+                                alert('Payment failed. Please try again.');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('An error occurred during the payment process. Please try again.');
+                    }
+                } else {
+                    alert('MetaMask is not installed. Please install MetaMask to make payments.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
